@@ -34,7 +34,7 @@ jobs:
       - name: Create venv and sync from lock
         run: |
           uv venv .venv
-          uv pip sync requirements.lock   # note: no "-r" with uv
+          uv pip sync requirements.lock
 
       - name: Run pylint using the locked env
         run: |
