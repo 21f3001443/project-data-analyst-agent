@@ -1,3 +1,3 @@
-from .wikipedia import Wikipedia
+from .main import Wikipedia
 
 __all__ = ["Wikipedia"]
