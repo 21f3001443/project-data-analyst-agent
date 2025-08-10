@@ -1,51 +1,51 @@
-name: Run Application (uv + lock)
+# name: Run Application (uv + lock)
 
-on:
-  workflow_dispatch:
-  push:
-    branches: [ main ]
+# on:
+#   workflow_dispatch:
+#   push:
+#     branches: [ main ]
 
-jobs:
-  run:
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        python-version: ["3.11"]
+# jobs:
+#   run:
+#     runs-on: ubuntu-latest
+#     strategy:
+#       matrix:
+#         python-version: ["3.11"]
 
-    steps:
-      - uses: actions/checkout@v4
+#     steps:
+#       - uses: actions/checkout@v4
 
-      - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v5
-        with:
-          python-version: ${{ matrix.python-version }}
+#       - name: Set up Python ${{ matrix.python-version }}
+#         uses: actions/setup-python@v5
+#         with:
+#           python-version: ${{ matrix.python-version }}
 
-      - name: Install uv
-        run: |
-          python -m pip install -U pip
-          python -m pip install -U uv
+#       - name: Install uv
+#         run: |
+#           python -m pip install -U pip
+#           python -m pip install -U uv
 
-      - name: Cache uv cache
-        uses: actions/cache@v4
-        with:
-          path: ~/.cache/uv
-          key: ${{ runner.os }}-uv-${{ hashFiles('requirements.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-uv-
+#       - name: Cache uv cache
+#         uses: actions/cache@v4
+#         with:
+#           path: ~/.cache/uv
+#           key: ${{ runner.os }}-uv-${{ hashFiles('requirements.lock') }}
+#           restore-keys: |
+#             ${{ runner.os }}-uv-
 
-      - name: Create venv and sync from lock
-        run: |
-          uv venv .venv
-          uv pip sync requirements.lock
+#       - name: Create venv and sync from lock
+#         run: |
+#           uv venv .venv
+#           uv pip sync requirements.lock
 
-      - name: Run the application
-        run: |
-          # Change `app2.py` to your actual entry script
-          uv run python app2.py
+#       - name: Run the application
+#         run: |
+#           # Change `app2.py` to your actual entry script
+#           uv run python app2.py
 
-      - name: Commit graph.png (if changed)
-        uses: EndBug/add-and-commit@v9
-        with:
-          add: graph2.png
-          message: "chore: update graph2.png (auto-generated)"
-          default_author: github_actions
+#       - name: Commit graph.png (if changed)
+#         uses: EndBug/add-and-commit@v9
+#         with:
+#           add: graph2.png
+#           message: "chore: update graph2.png (auto-generated)"
+#           default_author: github_actions
