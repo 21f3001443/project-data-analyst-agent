@@ -36,6 +36,7 @@ class State(TypedDict):
 
 def chatbot(state: State) -> State:
     response = llm.invoke([HumanMessage(content=state["messages"])])
+    print(response)
     return response.content
 
 builder = StateGraph(State)
