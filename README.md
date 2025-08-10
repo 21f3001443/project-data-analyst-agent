@@ -3,5 +3,5 @@
 ## App1
 ![Graph](graph1.png)
 
-## App1
+## App2
 ![Graph](graph2.png)
