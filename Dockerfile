@@ -10,6 +10,7 @@ ENV PATH="/home/user/.local/bin:$PATH"
 WORKDIR /app
 
 COPY --chown=user ./requirements.lock requirements.lock
+RUN pip install --no-cache-dir --upgrade uv uvicorn
 RUN uv pip sync requirements.lock
 
 COPY --chown=user . /app
