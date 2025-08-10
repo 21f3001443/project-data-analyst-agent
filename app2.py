@@ -1,4 +1,4 @@
-from typing import TypedDict
+from typing import TypedDict, Literal
 from langgraph.graph import StateGraph, START, END
 
 class PortfolioState(TypedDict):
