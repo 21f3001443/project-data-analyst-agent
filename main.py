@@ -32,11 +32,11 @@ class QuestionRequest(BaseModel):
     messages: str
 
 class State(TypedDict):
-    messages: list
+    messages: str
 
 def chatbot(state: State) -> State:
     response = llm.invoke([HumanMessage(content=state["messages"])])
-    print(response)
+    print("line39",response)
     return response.content
 
 builder = StateGraph(State)
@@ -54,7 +54,7 @@ with open("graph2.png", "wb") as f:
 
 @app.post("/api")
 def handle_question(request: QuestionRequest):
-    return JSONResponse(content=graph.invoke({"messages": [request.messages]}), status_code=200)
+    return JSONResponse(content=graph.invoke({"messages": request.messages}), status_code=200)
 
 if __name__ == "__main__":
     uvicorn.run("main:app", host="127.0.0.1", port=8000, reload=True)
