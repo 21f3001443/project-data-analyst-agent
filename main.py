@@ -6,6 +6,7 @@ from langgraph.graph.message import add_messages
 from langchain.chat_models import init_chat_model
 from langchain_openai import ChatOpenAI
 from langchain_core.messages import HumanMessage, AnyMessage
+from langgraph.checkpoint.memory import MemorySaver
 from openai import OpenAI
 
 from fastapi import FastAPI
@@ -35,12 +36,12 @@ class QuestionRequest(BaseModel):
     messages: str
 
 class State(TypedDict):
-    messages: Annotated[list, add_messages]
+    messages: Annotated[list[AnyMessage], add_messages]
 
 # ---------------- Graph nodes ----------------
 def chatbot(state: State) -> State:
     ai_msg = llm.invoke(state["messages"])
-    return {"messages": [*state["messages"], ai_msg]}
+    return {"messages": [ai_msg]}
 
 # ---------------- Build graph ----------------
 builder = StateGraph(State)
@@ -50,7 +51,9 @@ builder.add_node("chatbot", chatbot)
 builder.add_edge(START, "chatbot")
 builder.add_edge("chatbot", END)
 
-graph = builder.compile()
+checkpointer = MemorySaver() 
+
+graph = builder.compile(checkpointer=checkpointer)
 
 try:
     png_bytes = graph.get_graph().draw_mermaid_png()
@@ -63,7 +66,8 @@ except Exception:
 @app.post("/api")
 def handle_question(request: QuestionRequest):
     msgs = [HumanMessage(content=request.messages)]
-    result = graph.invoke({"messages": msgs})
+    config = {"configurable": {"thread_id": request.session_id}}
+    result = graph.invoke({"messages": msgs}, config=config)
     print("line66", result)
     last = result["messages"][-1]
     return JSONResponse(content={"messages": last.content}, status_code=200)
