@@ -1,6 +1,5 @@
 from typing import TypedDict
 from langgraph.graph import StateGraph, START, END
-from IPython.display import Image, display
 
 class PortfolioState(TypedDict):
     amount_usd: float
@@ -36,4 +35,3 @@ graph = builder.compile()
 png_bytes = graph.get_graph().draw_mermaid_png()
 with open("graph.png", "wb") as f:
     f.write(png_bytes)
-
