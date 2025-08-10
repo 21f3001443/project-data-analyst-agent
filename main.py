@@ -1,10 +1,10 @@
-from typing import TypedDict, Literal
+from typing import TypedDict, Literal, List
 import os
 
 from langgraph.graph import StateGraph, START, END
 from langchain.chat_models import init_chat_model
 from langchain_openai import ChatOpenAI
-from langchain_core.messages import HumanMessage
+from langchain_core.messages import HumanMessage, AnyMessage
 from openai import OpenAI
 
 from fastapi import FastAPI
@@ -32,13 +32,15 @@ class QuestionRequest(BaseModel):
     messages: str
 
 class State(TypedDict):
-    messages: str
+    messages: List[AnyMessage]
 
+# ---------------- Graph nodes ----------------
 def chatbot(state: State) -> State:
-    response = llm.invoke([HumanMessage(content=state["messages"])])
-    print("line39",response)
-    return response.content
+    ai_msg = llm.invoke(state["messages"])
+    print("line39",ai_msg)
+    return {"messages": [*state["messages"], ai_msg]}
 
+# ---------------- Build graph ----------------
 builder = StateGraph(State)
 
 builder.add_node("chatbot", chatbot)
@@ -48,13 +50,20 @@ builder.add_edge("chatbot", END)
 
 graph = builder.compile()
 
-png_bytes = graph.get_graph().draw_mermaid_png()
-with open("graph2.png", "wb") as f:
-    f.write(png_bytes)
+try:
+    png_bytes = graph.get_graph().draw_mermaid_png()
+    with open("graph2.png", "wb") as f:
+        f.write(png_bytes)
+except Exception:
+    pass
 
+# ---------------- Routes ----------------
 @app.post("/api")
 def handle_question(request: QuestionRequest):
-    return JSONResponse(content=graph.invoke({"messages": request.messages}), status_code=200)
+    msgs = [HumanMessage(content=request.messages)]
+    result = graph.invoke({"messages": msgs})
+    last = result["messages"][-1]
+    return JSONResponse(content={"messages": last.content}, status_code=200)
 
 if __name__ == "__main__":
     uvicorn.run("main:app", host="127.0.0.1", port=8000, reload=True)
