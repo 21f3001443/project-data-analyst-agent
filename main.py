@@ -1,5 +1,4 @@
-from typing import TypedDict, Annotated
-import os
+from typing import TypedDict, Annotated, Optional
 
 from langgraph.graph import StateGraph, START, END
 from langgraph.graph.message import add_messages
@@ -34,6 +33,7 @@ llm = ChatOpenAI(model="gpt-5", temperature=0)
 # ---------------- Types ----------------
 class QuestionRequest(BaseModel):
     messages: str
+    session_id: Optional[str] = "default"
 
 class State(TypedDict):
     messages: Annotated[list[AnyMessage], add_messages]
