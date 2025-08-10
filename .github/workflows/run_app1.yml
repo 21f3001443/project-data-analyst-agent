@@ -40,12 +40,12 @@ jobs:
 
       - name: Run the application
         run: |
-          # Change `app.py` to your actual entry script
-          uv run python app.py
+          # Change `app1.py` to your actual entry script
+          uv run python app1.py
 
       - name: Commit graph.png (if changed)
         uses: EndBug/add-and-commit@v9
         with:
-          add: graph.png
-          message: "chore: update graph.png (auto-generated)"
+          add: graph1.png
+          message: "chore: update graph1.png (auto-generated)"
           default_author: github_actions

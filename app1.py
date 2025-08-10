@@ -33,5 +33,5 @@ builder.add_edge("convert_to_inr", END)
 graph = builder.compile()
 
 png_bytes = graph.get_graph().draw_mermaid_png()
-with open("graph.png", "wb") as f:
+with open("graph1.png", "wb") as f:
     f.write(png_bytes)
