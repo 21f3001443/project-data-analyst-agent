@@ -1,7 +1,8 @@
-from typing import TypedDict, Literal, List
+from typing import TypedDict, Annotated
 import os
 
 from langgraph.graph import StateGraph, START, END
+from langgraph.graph.message import add_messages
 from langchain.chat_models import init_chat_model
 from langchain_openai import ChatOpenAI
 from langchain_core.messages import HumanMessage, AnyMessage
@@ -16,6 +17,7 @@ import httpx
 
 from pydantic import BaseModel
 
+# ---------------- FastAPI app ----------------
 app = FastAPI()
 app.add_middleware(
     CORSMiddleware,
@@ -25,19 +27,19 @@ app.add_middleware(
     allow_credentials=True,
 )
 
-# client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"),http_client=httpx.Client(verify=False))
-llm = ChatOpenAI(model="gpt-4o", temperature=0)
+# ---------------- LLM ----------------
+llm = ChatOpenAI(model="gpt-5", temperature=0)
 
+# ---------------- Types ----------------
 class QuestionRequest(BaseModel):
     messages: str
 
 class State(TypedDict):
-    messages: List[AnyMessage]
+    messages: Annotated[list, add_messages]
 
 # ---------------- Graph nodes ----------------
 def chatbot(state: State) -> State:
     ai_msg = llm.invoke(state["messages"])
-    print("line39",ai_msg)
     return {"messages": [*state["messages"], ai_msg]}
 
 # ---------------- Build graph ----------------
@@ -62,6 +64,7 @@ except Exception:
 def handle_question(request: QuestionRequest):
     msgs = [HumanMessage(content=request.messages)]
     result = graph.invoke({"messages": msgs})
+    print("line66", result)
     last = result["messages"][-1]
     return JSONResponse(content={"messages": last.content}, status_code=200)
 
