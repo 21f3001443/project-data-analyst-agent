@@ -33,4 +33,7 @@ builder.add_edge("convert_to_inr", END)
 
 graph = builder.compile()
 
-display(Image(graph.get_graph().draw_mermaid_png()))
+png_bytes = graph.get_graph().draw_mermaid_png()
+with open("graph.png", "wb") as f:
+    f.write(png_bytes)
+
