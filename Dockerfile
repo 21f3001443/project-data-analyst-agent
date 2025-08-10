@@ -11,6 +11,7 @@ WORKDIR /app
 
 COPY --chown=user ./requirements.lock requirements.lock
 RUN pip install --no-cache-dir --upgrade uv uvicorn
+RUN uv venv .venv
 RUN uv pip sync requirements.lock
 
 COPY --chown=user . /app
