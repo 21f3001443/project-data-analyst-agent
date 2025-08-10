@@ -26,7 +26,7 @@ app.add_middleware(
 )
 
 # client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"),http_client=httpx.Client(verify=False))
-llm = ChatOpenAI(model="gpt-5", temperature=0)
+llm = ChatOpenAI(model="gpt-4o", temperature=0)
 
 class QuestionRequest(BaseModel):
     messages: str
