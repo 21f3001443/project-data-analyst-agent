@@ -1,5 +1,7 @@
 from typing import TypedDict, Annotated, Optional
 
+import pandas as pd
+
 from langgraph.graph import StateGraph, START, END
 from langgraph.graph.message import add_messages
 from langgraph.prebuilt import ToolNode, tools_condition
@@ -18,6 +20,7 @@ import uvicorn
 from pydantic import BaseModel
 
 from agents.wikipedia import Wikipedia
+from agents.sessionstore import SessionStore
 
 # ---------------- FastAPI app ----------------
 app = FastAPI()
@@ -32,6 +35,9 @@ app.add_middleware(
 # ---------------- LLM ----------------
 llm = ChatOpenAI(model="gpt-5-nano", temperature=0)
 
+# ---------------- Session store ----------------
+session_store = SessionStore(inactivity_seconds=300)  # 5 minutes
+
 # ---------------- Types ----------------
 class QuestionRequest(BaseModel):
     messages: str
@@ -43,24 +49,24 @@ class State(TypedDict):
 
 # ---------------- Tools ----------------
 @tool
-def search_wikipedia_by_search_query(query: str) -> str:
+def search_wikipedia_by_search_query(query: str) -> dict[str, pd.DataFrame] | None:
     """
-    Search Wikipedia for the given query and return scraped HTML.
+    Search Wikipedia for the given query and return scraped table.
     :param query: The search query string.
-    :return: The scraped HTML content of the Wikipedia page.
+    :return: The scraped table content of the Wikipedia page.
     """
     wiki = Wikipedia(search_query=query)
-    return wiki.scrape()
+    return wiki.scrapeTable()
 
 @tool
-def search_wikipedia_by_url(url: str) -> str:
+def search_wikipedia_by_url(url: str) -> dict[str, pd.DataFrame] | None:
     """
-    Search Wikipedia for the given url and return scraped HTML.
+    Search Wikipedia for the given url and return scraped table.
     :param url: The URL of the Wikipedia page.
-    :return: The scraped HTML content of the Wikipedia page.
+    :return: The scraped table content of the Wikipedia page.
     """
     wiki = Wikipedia(url=url)
-    return wiki.scrape()
+    return wiki.scrapeTable()
 
 tools = [search_wikipedia_by_search_query, search_wikipedia_by_url]
 
@@ -96,9 +102,10 @@ except Exception:
 @app.post("/api")
 def handle_question(request: QuestionRequest):
     msgs = [HumanMessage(content=request.messages)]
-    config = {"configurable": {"thread_id": request.session_id}}
+    thread_id = session_store.next_thread_id(request.session_id or "default")
+    config = {"configurable": {"thread_id": thread_id}}
     result = graph.invoke({"messages": msgs}, config=config)
-    print("line66", result)
+    print("line66", thread_id)
     last = result["messages"][-1]
     return JSONResponse(content={"messages": last.content}, status_code=200)
 
