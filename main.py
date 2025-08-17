@@ -115,7 +115,7 @@ def scatter_plot_regression(data: List[Dict[str, Any]], xlabel: str, ylabel: str
         plotter = ScatterPlot(add_regression=True, fmt=fmt)
         encoded = plotter.encode(data, xlabel=xlabel, ylabel=ylabel, title=title)
         print("leaving scatter_plot_regression")
-        return encoded
+        return encoded.split(",", 1)[1]
     except Exception as e:
         print("errored scatter_plot_regression")
         return e
@@ -136,7 +136,7 @@ def scatter_plot_regression(data: List[Dict[str, Any]], xlabel: str, ylabel: str
         plotter = ScatterPlot(add_regression=True, fmt=fmt)
         encoded = plotter.encode(data, xlabel=xlabel, ylabel=ylabel, title=title)
         print("leaving scatter_plot_regression")
-        return encoded
+        return encoded.split(",", 1)[1]
     except Exception as e:
         print("errored scatter_plot_regression")
         return e
