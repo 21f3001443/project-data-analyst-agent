@@ -1,4 +1,4 @@
-from typing_extensions import Dict, List, TypedDict, Annotated, Optional, Any
+from typing_extensions import Dict, List, TypedDict, Annotated, Optional, Any, Tuple
 import json
 import base64
 import mimetypes
@@ -26,7 +26,7 @@ from starlette.datastructures import UploadFile as StarletteUploadFile
 
 from agents.wikipedia import Wikipedia
 from agents.sessionstore import SessionStore
-from agents.plot import ScatterPlot
+from agents.plot import ChartRenderer, GraphRenderer
 
 # ---------------- FastAPI app ----------------
 app = FastAPI()
@@ -55,141 +55,320 @@ class State(TypedDict, total=False):
 
 # ---------------- Tools ----------------
 @tool
-def search_wikipedia_by_search_query(query: str) -> dict[str, pd.DataFrame] | None:
+def search_wikipedia_by_query(query: str) -> dict[str, pd.DataFrame] | None:
     """
-    Search Wikipedia for the given query and return scraped table.
-    :param query: The search query string.
-    :return: The scraped table content of the Wikipedia page.
+    Given a search query string, resolve it to a Wikipedia page and scrape its tables.
+    
+    :param query: Search term, e.g. "Amazon (company)".
+    :return: Dict of DataFrames keyed by table headers, or None if no valid tables found.
     """
-    print("Running search_wikipedia_by_search_query")
+    print("Running search_wikipedia_by_query")
     wiki = Wikipedia(search_query=query)
-    normalized_data = wiki.scrapeTable()
-    return normalized_data
+    if not wiki.valid:
+        print(f"Unable to resolve query to a valid page: {query}")
+        return None
+    return wiki.scrapeTable()
 
 @tool
 def search_wikipedia_by_url(url: str) -> dict[str, pd.DataFrame] | None:
     """
-    Search Wikipedia for the given url and return scraped table.
-    :param url: The URL of the Wikipedia page.
-    :return: The scraped table content of the Wikipedia page.
+    Given a Wikipedia page URL, scrape and return its tables.
+    
+    :param url: The canonical Wikipedia URL, e.g. "https://en.wikipedia.org/wiki/Amazon_(company)".
+    :return: Dict of DataFrames keyed by table headers, or None if no valid tables found.
     """
     print("Running search_wikipedia_by_url")
     wiki = Wikipedia(url=url)
-    normalized_data = wiki.scrapeTable()
-    return normalized_data
+    if not wiki.valid:
+        print(f"Invalid or unreachable URL: {url}")
+        return None
+    return wiki.scrapeTable()
 
 @tool
-def scatter_plot(data: List[Dict[str, Any]], xlabel: str, ylabel: str, title: str, fmt: str) -> str | None:
+def bar_chart(
+    data: List[Dict[str, Any]],
+    x: str,
+    y: str,
+    title: Optional[str] = None,
+    fmt: str = "png",
+    return_data_uri: bool = False,
+    bar_color: str = "C0",
+    alpha: float = 0.9
+) -> str | None:
+    """
+    Create a bar chart for given data.
+
+    :param data: The data to plot (List[Dict[str, Any]]).
+    :param x: The column name for the x-axis.
+    :param y: The column name for the y-axis.
+    :param title: The title of the plot. Defaults to "<y> by <x>" if not provided.
+    :param fmt: The format of the plot (e.g. "png", "jpg", "webp"). Default is "png".
+    :param return_data_uri: If True, returns a full data URI string (useful for embedding in HTML/Markdown).
+    :param bar_color: The color of the bars (default is matplotlib's "C0").
+    :param alpha: Transparency of the bars (0.0 = fully transparent, 1.0 = fully opaque).
+    :return: The bar chart as a base64-encoded image (string).
+    """
+    print("running bar_chart")
+    try:
+        plotter = ChartRenderer(fmt=fmt)
+        encoded = plotter.encode(
+            pd.DataFrame(data),
+            x=x,
+            y=y,
+            title=title,
+            kind="bar",
+            return_data_uri=return_data_uri,
+            bar_color=bar_color,
+            alpha=alpha
+        )
+        print("leaving bar_chart")
+        return encoded
+    except Exception as e:
+        print("errored bar_chart", e)
+        return None
+    
+@tool
+def line_chart(
+    data: List[Dict[str, Any]],
+    x: str,
+    y: str,
+    title: Optional[str] = None,
+    fmt: str = "png",
+    return_data_uri: bool = False,
+    line_color: str = "C0",
+    alpha: float = 0.9
+) -> str | None:
+    """
+    Create a line chart for given data.
+
+    :param data: The data to plot (List[Dict[str, Any]]).
+    :param x: The column name for the x-axis.
+    :param y: The column name for the y-axis.
+    :param title: The title of the plot. Defaults to "<y> over <x>" if not provided.
+    :param fmt: The format of the plot (e.g. "png", "jpg", "webp"). Default is "png".
+    :param return_data_uri: If True, returns a full data URI string (useful for embedding in HTML/Markdown).
+    :param line_color: The color of the line.
+    :param alpha: Transparency of the line (0.0 = fully transparent, 1.0 = fully opaque).
+    :return: The line chart as a base64-encoded image (string).
+    """
+    print("running line_chart")
+    try:
+        plotter = ChartRenderer(fmt=fmt)
+        encoded = plotter.encode(
+            pd.DataFrame(data),
+            x=x,
+            y=y,
+            title=title,
+            kind="line",
+            return_data_uri=return_data_uri,
+            line_color=line_color,
+            alpha=alpha
+        )
+        print("leaving line_chart")
+        return encoded
+    except Exception as e:
+        print("errored line_chart", e)
+        return None
+    
+@tool
+def scatter_plot(
+    data: List[Dict[str, Any]],
+    x: str,
+    y: str,
+    title: Optional[str] = None,
+    fmt: str = "png",
+    return_data_uri: bool = False,
+    color: str = "C0",
+    point_size: int = 30,
+    alpha: float = 0.7
+) -> str | None:
     """
     Create a scatter plot for given data.
-    :param data: The data to plot in the form List[Dict[str, Any]].
-    :param xlabel: The column name for the x-axis.
-    :param ylabel: The column name for the y-axis.
-    :param title: The title of the plot.
+
+    :param data: The data to plot (list[dict], pandas.DataFrame, or {"columns": ..., "rows": ...}).
+    :param x: The column name for the x-axis.
+    :param y: The column name for the y-axis.
+    :param title: The title of the plot. Defaults to "<x> vs <y>".
     :param fmt: The format of the plot (e.g. "png", "jpg", "webp").
+    :param return_data_uri: If True, returns a full data URI string.
+    :param color: Color of scatter points.
+    :param point_size: Size of scatter points.
+    :param alpha: Transparency of scatter points.
     :return: The scatter plot as a base64-encoded image.
     """
     print("running scatter_plot")
     try:
-        plotter = ScatterPlot(fmt=fmt)
-        encoded = plotter.encode(data, xlabel=xlabel, ylabel=ylabel, title=title)
+        plotter = ChartRenderer(fmt=fmt)
+        encoded = plotter.encode(
+            pd.DataFrame(data),
+            x=x,
+            y=y,
+            title=title,
+            kind="scatter",
+            return_data_uri=return_data_uri,
+            color=color,
+            point_size=point_size,
+            alpha=alpha
+        )
         print("leaving scatter_plot")
         return encoded
     except Exception as e:
-        print("errored scatter_plot")
-        return e
-
-@tool
-def scatter_plot_regression(data: List[Dict[str, Any]], xlabel: str, ylabel: str, title: str, fmt: str) -> str | None:
-    """
-    Create a scatter plot for given data with regression line.
-    :param data: The data to plot in the form List[Dict[str, Any]].
-    :param xlabel: The column name for the x-axis.
-    :param ylabel: The column name for the y-axis.
-    :param title: The title of the plot.
-    :param fmt: The format of the plot (e.g. "png", "jpg", "webp").
-    :return: The scatter plot as a base64-encoded image.
-    """
-    print("running scatter_plot_regression")
-    try:
-        plotter = ScatterPlot(add_regression=True, fmt=fmt)
-        encoded = plotter.encode(data, xlabel=xlabel, ylabel=ylabel, title=title)
-        print("leaving scatter_plot_regression")
-        return encoded.split(",", 1)[1]
-    except Exception as e:
-        print("errored scatter_plot_regression")
-        return e
+        print("errored scatter_plot", e)
+        return None
     
 @tool
-def scatter_plot_regression(data: List[Dict[str, Any]], xlabel: str, ylabel: str, title: str, fmt: str) -> str | None:
+def network_plot(
+    data: List[Dict[str, str]],
+    title: Optional[str] = None,
+    fmt: str = "png",
+    return_data_uri: bool = False,
+    source_col: str = "source",
+    target_col: str = "target"
+) -> str | None:
     """
-    Create a scatter plot for given data with regression line.
+    Create a network plot from edge data and return it as a base64-encoded image.
+
+    :param data: List of dicts with edge definitions.
+                 Example: [{"source": "A", "target": "B"}, {"source": "B", "target": "C"}]
+    :param title: The title of the plot. Defaults to "Network Graph".
+    :param fmt: The image format for the plot (e.g. "png", "jpg", "webp").
+    :param return_data_uri: If True, return a full data URI (e.g. "data:image/png;base64,..."),
+                            otherwise return just the raw base64 string.
+    :param source_col: The column in the dicts representing source nodes.
+    :param target_col: The column in the dicts representing target nodes.
+    :return: The network plot encoded as a base64 string (or data URI).
+    """
+    print("running network_plot")
+    try:
+        # Ensure DataFrame with proper column names
+        df = pd.DataFrame(data)
+        if not {source_col, target_col}.issubset(df.columns):
+            raise ValueError(f"Input data must contain '{source_col}' and '{target_col}' keys.")
+        
+        # Force all values to strings for consistent labeling
+        df = df.astype(str)
+
+        plotter = GraphRenderer(fmt=fmt)
+        encoded = plotter.encode(
+            df,
+            title=title,
+            return_data_uri=return_data_uri,
+            source_col=source_col,
+            target_col=target_col
+        )
+        print("leaving network_plot")
+        return encoded
+    except Exception as e:
+        print("errored network_plot", e)
+        return None
+
+@tool
+def scatter_plot_regression(
+    data: List[Dict[str, Any]],
+    x: str,
+    y: str,
+    title: Optional[str] = None,
+    fmt: str = "png",
+    return_data_uri: bool = False,
+    color: str = "C0",
+    line_color: str = "black",
+    show_r2: bool = True
+) -> str | None:
+    """
+    Create a scatter plot for given data with an optional regression line.
+
     :param data: The data to plot in the form List[Dict[str, Any]].
-    :param xlabel: The column name for the x-axis.
-    :param ylabel: The column name for the y-axis.
-    :param title: The title of the plot.
+    :param x: The column name for the x-axis.
+    :param y: The column name for the y-axis.
+    :param title: The title of the plot. Defaults to "<x> vs <y>".
     :param fmt: The format of the plot (e.g. "png", "jpg", "webp").
-    :return: The scatter plot as a base64-encoded image.
+    :param return_data_uri: If True, returns a full data URI string.
+    :param color: Color for scatter points.
+    :param line_color: Color for regression line.
+    :param show_r2: Whether to show R² value on the plot.
+    :return: The scatter plot as a base64-encoded image (string).
     """
     print("running scatter_plot_regression")
     try:
-        plotter = ScatterPlot(add_regression=True, fmt=fmt)
-        encoded = plotter.encode(data, xlabel=xlabel, ylabel=ylabel, title=title)
+        plotter = ChartRenderer(fmt=fmt)
+        encoded = plotter.encode(
+            pd.DataFrame(data),
+            x=x,
+            y=y,
+            kind="scatter",
+            title=title,
+            regression=True,
+            show_r2=show_r2,
+            return_data_uri=return_data_uri,
+            color=color,
+            line_color=line_color
+        )
         print("leaving scatter_plot_regression")
-        return encoded.split(",", 1)[1]
+        return encoded
     except Exception as e:
-        print("errored scatter_plot_regression")
-        return e
+        print("errored scatter_plot_regression", e)
+        return None
 
 
 @tool
 def duckdb_sql_query_runner(query: str) -> pd.DataFrame | str:
     """
-    Run a SQL query against the DuckDB database.
-    It supports both httpfs and parquet.
-    SQL query should contain URL if the data is stored in S3/remotely. 
-    Eg: SELECT COUNT(*) FROM read_parquet('s3://s3path');
-    Use date format casting if required
-    Eg: TRY_CAST(TRY_STRPTIME(date_of_registration, '%d-%m-%Y') AS DATE)
-    :param query: The SQL query to run.
-    :return: The result of the query as a DataFrame.
+    Execute a SQL query using DuckDB.
+
+    This utility supports both `httpfs` and Parquet file formats. Queries may reference
+    remote data sources such as S3 buckets by providing the appropriate URL.
+
+    Example usage:
+        SELECT COUNT(*) FROM read_parquet('s3://bucket-name/path/to/file.parquet');
+
+    For date conversions, use explicit casting to ensure proper parsing:
+        TRY_CAST(TRY_STRPTIME(date_of_registration, '%d-%m-%Y') AS DATE)
+
+    :param query: The SQL query string to be executed.
+    :return: A pandas DataFrame containing the query result if successful,
+             otherwise an error message string.
     """
-    print("running duckdb_sql_query_runner")
+    print("Running duckdb_sql_query_runner")
     try:
         con = duckdb.connect()
         result = con.execute(query).df()
         print("Leaving duckdb_sql_query_runner")
         return result
     except Exception as e:
-        print("errored duckdb_sql_query_runner")
+        print("Errored in duckdb_sql_query_runner")
         print("Error:", e)
-        return e
+        return str(e)
 
 @tool
 def duckdb_sql_query_runner_summary(query: str) -> str | None:
     """
-    Run a SQL query against the DuckDB database.
-    It supports both httpfs and parquet.
-    SQL query should contain URL if the data is stored in S3/remotely. 
-    Eg: SELECT COUNT(*) FROM read_parquet('s3://s3path');
-    Use date format casting if required
-    Eg: TRY_CAST(TRY_STRPTIME(date_of_registration, '%d-%m-%Y') AS DATE)
-    :param query: The SQL query to run.
-    :return: The result of the query as a string.
+    Execute a SQL query using DuckDB and return the result as a string.
+
+    This utility supports both `httpfs` and Parquet file formats. Queries may reference
+    remote data sources such as S3 buckets by providing the appropriate URL.
+
+    Example usage:
+        SELECT COUNT(*) FROM read_parquet('s3://bucket-name/path/to/file.parquet');
+
+    For date conversions, use explicit casting to ensure proper parsing:
+        TRY_CAST(TRY_STRPTIME(date_of_registration, '%d-%m-%Y') AS DATE)
+
+    :param query: The SQL query string to be executed.
+    :return: The query result as a formatted string, or None if an error occurs.
     """
-    print("running duckdb_sql_query_runner_summary")
+    print("Running duckdb_sql_query_runner_summary")
     try:
         con = duckdb.connect()
         result = con.execute(query).df()
         print("Leaving duckdb_sql_query_runner_summary")
-        return result.to_string()
+        return result.to_string(index=False)
     except Exception as e:
-        print("Errored duckdb_sql_query_runner_summary")
+        print("Errored in duckdb_sql_query_runner_summary")
         print("Error:", e)
-        return 
+        return None
     
 
-tools = [search_wikipedia_by_search_query, search_wikipedia_by_url, scatter_plot, scatter_plot_regression, duckdb_sql_query_runner, duckdb_sql_query_runner_summary]
+tools = [search_wikipedia_by_query, search_wikipedia_by_url, scatter_plot, scatter_plot_regression, duckdb_sql_query_runner, duckdb_sql_query_runner_summary, bar_chart, line_chart, network_plot]
 
 llm_with_tools = llm.bind_tools(tools)
 
@@ -249,14 +428,15 @@ def research_questions(state: State) -> State:
 
         system_prompt = """You are a helpful assistant.
 
-        Use the provided *Messages* *Files* *Images* *CSVs* as context to reasearch and answer each *Question*.
-        - instructions are provided
+        Use the provided *Messages* *Files* *Images* *CSVs* as context to research and answer each *Question*.
+        - Instructions are provided
         - If tools are required, call them.
         - Once research is complete, return with a list of answers in the similar order as **Questions** only.
-        - the final answer return only the final answer, with no extra text.
+        - The final answer must contain only the final answer, with no extra text.
         - If the answer is a number, output only the number.
-        - Prefer the tool output(Eg: scatterplot) unless the tool explicitly returns an error or is empty.
+        - Prefer the tool output (e.g., scatterplot) unless the tool explicitly returns an error or is empty.
         - If the tool errors or returns no usable value, use the model's answer.
+        - Strictly no base64 images or plots generated directly from the model.
         """
 
         messages = [

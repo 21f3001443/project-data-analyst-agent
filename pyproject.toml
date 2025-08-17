@@ -29,6 +29,7 @@ dependencies = [
   "matplotlib>=3.10.5,<4",
   "python-multipart>=0.0.20,<1",
   "pillow>=11.3.0,<12",
+  "networkx>=3.5,<4",
 ]
 
 [project.optional-dependencies]
