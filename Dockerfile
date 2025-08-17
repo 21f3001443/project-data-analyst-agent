@@ -15,4 +15,4 @@ RUN uv venv .venv
 RUN uv pip sync requirements.lock
 
 COPY --chown=user . /app
-CMD ["uv", "run", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "7860", "--reload"]
+CMD ["uv", "run", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "7860", "--workers", "4"]
