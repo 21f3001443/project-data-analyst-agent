@@ -8,6 +8,7 @@ import asyncio
 import random
 import os
 import string
+import mimetypes
 
 import pandas as pd
 import duckdb
@@ -570,11 +571,12 @@ def research_questions(state: State) -> State:
         # print("Current message:", messages[-1])
         messages = [
             SystemMessage(content=system_prompt),
-            HumanMessage(
-                content=f"Instructions:{instructions}\nMessages:\n{messages}\nQuestions:\n{questions}\nFiles:\n{files}\nImages:\n{images}\nCSVs:\n{csvs}\n"
-            )
+            HumanMessage(content=[
+                {"type": "text", "text": f"Instructions: {instructions}\nMessages: {messages}\nQuestions: {questions}\nFiles: {files}\nCSVs: {csvs}"}
+            ] + [
+                {"type": "image_url", "image_url": {"url": img}} for img in images
+            ])
         ]
-
         ai_msg = llm_with_tools.invoke(messages)
         # print("AI Message:", repr(ai_msg))
         print("Leaving research_questions")
@@ -709,7 +711,10 @@ async def handle_question(request: Request, session_id: str = Form("default")):
         # IMAGE HANDLING
         if content_type and content_type.startswith("image/"):
             print("Found image:", file.filename)
-            image_b64s.append(base64.b64encode(raw_bytes).decode("utf-8"))
+            mime_type, _ = mimetypes.guess_type(file.filename)
+            if mime_type is None:
+                mime_type = "application/octet-stream"  # fallback
+            image_b64s.append(f"data:{mime_type};base64," + base64.b64encode(raw_bytes).decode("utf-8"))
 
         # CSV HANDLING
         elif ext == "csv" or content_type in ["text/csv", "application/vnd.ms-excel"]:
@@ -741,7 +746,7 @@ async def handle_question(request: Request, session_id: str = Form("default")):
     config = {"configurable": {"thread_id": thread_id}, "recursion_limit": 25}
     question_hm = [HumanMessage(content=questions_text)]
     file_texts_hm = [HumanMessage(content=file_texts)]
-    image_b64s_hm = [HumanMessage(content=image_b64s)]
+    image_b64s_hm = image_b64s
     csv_data_hm = [HumanMessage(content=csv_data)]
 
     # result = graph.invoke({"messages": question_hm, "files": file_texts_hm, "images": image_b64s_hm, "csvs": csv_data_hm}, config=config, debug=True)
