@@ -847,6 +847,7 @@ langchain-core==0.3.74 \
     --hash=sha256:088338b5bc2f6a66892f9afc777992c24ee3188f41cbc603d09181e34a228ce7 \
     --hash=sha256:ff604441aeade942fbcc0a3860a592daba7671345230c2078ba2eb5f82b6ba76
     # via
+    #   da-agent (pyproject.toml)
     #   langchain
     #   langchain-openai
     #   langchain-text-splitters

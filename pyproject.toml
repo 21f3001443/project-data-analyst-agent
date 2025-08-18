@@ -30,6 +30,7 @@ dependencies = [
   "python-multipart>=0.0.20,<1",
   "pillow>=11.3.0,<12",
   "networkx>=3.5,<4",
+  "langchain-core>=0.3.74,<1",
 ]
 
 [project.optional-dependencies]

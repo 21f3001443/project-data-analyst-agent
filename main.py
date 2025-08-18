@@ -5,6 +5,9 @@ import mimetypes
 import csv
 import io
 import asyncio
+import random
+import os
+import string
 
 import pandas as pd
 import duckdb
@@ -17,6 +20,7 @@ from langgraph.checkpoint.memory import MemorySaver
 from langchain_openai import ChatOpenAI
 from langchain_core.messages import HumanMessage, AnyMessage, SystemMessage
 from langchain_core.tools import tool
+from langchain_core.documents.base import Blob
 
 from fastapi import FastAPI, UploadFile, Form, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -39,7 +43,7 @@ app.add_middleware(
 )
 
 # ---------------- LLM ----------------
-llm = ChatOpenAI(model="gpt-5-micro", temperature=0, seed=1)
+llm = ChatOpenAI(model="gpt-5-nano", temperature=0, seed=1)
 
 # ---------------- Session store ----------------
 session_store = SessionStore(inactivity_seconds=5)  # 5 minutes
@@ -54,6 +58,53 @@ class State(TypedDict, total=False):
     csvs: Optional[list[str]]
 
 # ---------------- Tools ----------------
+def save_blob_to_file(blob, directory=".", filename=None, unique=True, length=8):
+    """
+    Save a langchain_core.documents.Blob to a local file with optional randomness.
+
+    Args:
+        blob (Blob): The Blob object to save.
+        directory (str): Directory to save file (default: current directory).
+        filename (str): Optional filename. If None, use blob.path or 'blob_output'.
+        unique (bool): If True, append random string to filename.
+        length (int): Length of random suffix (default: 8).
+        
+    Returns:
+        str: Full path of the saved file.
+    """
+    print("Running save_blob_to_file")
+    if not isinstance(blob, Blob):
+        raise ValueError("Input must be a langchain_core.documents.base.Blob object")
+
+    # Ensure directory exists
+    if not os.path.isabs(directory):
+        directory = os.path.abspath(directory)
+    if not os.path.exists(directory):
+        os.makedirs(directory)
+
+    # Base filename
+    if filename is None:
+        filename = blob.path if blob.path else "blob_output"
+
+    # Add extension if missing
+    if "." not in filename and blob.mime_type:
+        ext = blob.mime_type.split("/")[-1]
+        filename = f"{filename}.{ext}"
+
+    # Ensure uniqueness using random letters/numbers
+    if unique:
+        suffix = ''.join(random.choices(string.ascii_lowercase + string.digits, k=length))
+        name, ext = os.path.splitext(filename)
+        filename = f"{name}_{suffix}{ext}"
+
+    filepath = os.path.join(directory, filename)
+
+    # Write binary data
+    with open(filepath, "wb") as f:
+        f.write(blob.data)
+
+    return filepath
+
 @tool
 def search_wikipedia_by_query(query: str) -> dict[str, pd.DataFrame] | None:
     """
@@ -106,12 +157,26 @@ def bar_chart(
     :param return_data_uri: If True, returns a full data URI string (useful for embedding in HTML/Markdown).
     :param bar_color: The color of the bars (default is matplotlib's "C0").
     :param alpha: Transparency of the bars (0.0 = fully transparent, 1.0 = fully opaque).
-    :return: The bar chart as a base64-encoded image (string).
+    :return: The bar chart location where it is saved.
     """
     print("running bar_chart")
+    # try:
+    #     plotter = ChartRenderer(fmt=fmt)
+    #     encoded = plotter.encode(
+    #         pd.DataFrame(data),
+    #         x=x,
+    #         y=y,
+    #         title=title,
+    #         kind="bar",
+    #         return_data_uri=return_data_uri,
+    #         bar_color=bar_color,
+    #         alpha=alpha
+    #     )
+    #     print("leaving bar_chart")
+    #     return encoded
     try:
         plotter = ChartRenderer(fmt=fmt)
-        encoded = plotter.encode(
+        blob = plotter.encode(
             pd.DataFrame(data),
             x=x,
             y=y,
@@ -121,8 +186,9 @@ def bar_chart(
             bar_color=bar_color,
             alpha=alpha
         )
+        file_path = save_blob_to_file(blob, directory="./output")
         print("leaving bar_chart")
-        return encoded
+        return file_path
     except Exception as e:
         print("errored bar_chart", e)
         return None
@@ -149,12 +215,26 @@ def line_chart(
     :param return_data_uri: If True, returns a full data URI string (useful for embedding in HTML/Markdown).
     :param line_color: The color of the line.
     :param alpha: Transparency of the line (0.0 = fully transparent, 1.0 = fully opaque).
-    :return: The line chart as a base64-encoded image (string).
+    :return: The line chart location where it is saved.
     """
     print("running line_chart")
+    # try:
+    #     plotter = ChartRenderer(fmt=fmt)
+    #     encoded = plotter.encode(
+    #         pd.DataFrame(data),
+    #         x=x,
+    #         y=y,
+    #         title=title,
+    #         kind="line",
+    #         return_data_uri=return_data_uri,
+    #         line_color=line_color,
+    #         alpha=alpha
+    #     )
+    #     print("leaving line_chart")
+    #     return encoded
     try:
         plotter = ChartRenderer(fmt=fmt)
-        encoded = plotter.encode(
+        blob = plotter.encode(
             pd.DataFrame(data),
             x=x,
             y=y,
@@ -164,8 +244,9 @@ def line_chart(
             line_color=line_color,
             alpha=alpha
         )
+        file_path = save_blob_to_file(blob, directory="./output")
         print("leaving line_chart")
-        return encoded
+        return file_path
     except Exception as e:
         print("errored line_chart", e)
         return None
@@ -194,12 +275,27 @@ def scatter_plot(
     :param color: Color of scatter points.
     :param point_size: Size of scatter points.
     :param alpha: Transparency of scatter points.
-    :return: The scatter plot as a base64-encoded image.
+    :return: The scatter plot location where it is saved.
     """
     print("running scatter_plot")
+    # try:
+    #     plotter = ChartRenderer(fmt=fmt)
+    #     encoded = plotter.encode(
+    #         pd.DataFrame(data),
+    #         x=x,
+    #         y=y,
+    #         title=title,
+    #         kind="scatter",
+    #         return_data_uri=return_data_uri,
+    #         color=color,
+    #         point_size=point_size,
+    #         alpha=alpha
+    #     )
+    #     print("leaving scatter_plot")
+    #     return encoded
     try:
         plotter = ChartRenderer(fmt=fmt)
-        encoded = plotter.encode(
+        blob = plotter.encode(
             pd.DataFrame(data),
             x=x,
             y=y,
@@ -210,8 +306,9 @@ def scatter_plot(
             point_size=point_size,
             alpha=alpha
         )
+        file_path = save_blob_to_file(blob, directory="./output")
         print("leaving scatter_plot")
-        return encoded
+        return file_path
     except Exception as e:
         print("errored scatter_plot", e)
         return None
@@ -236,7 +333,7 @@ def network_plot(
                             otherwise return just the raw base64 string.
     :param source_col: The column in the dicts representing source nodes.
     :param target_col: The column in the dicts representing target nodes.
-    :return: The network plot encoded as a base64 string (or data URI).
+    :return: The network plot location where it is saved.
     """
     print("running network_plot")
     try:
@@ -249,15 +346,25 @@ def network_plot(
         df = df.astype(str)
 
         plotter = GraphRenderer(fmt=fmt)
-        encoded = plotter.encode(
+        # encoded = plotter.encode(
+        #     df,
+        #     title=title,
+        #     return_data_uri=return_data_uri,
+        #     source_col=source_col,
+        #     target_col=target_col
+        # )
+        # print("leaving network_plot")
+        # return encoded
+        blob = plotter.encode(
             df,
             title=title,
             return_data_uri=return_data_uri,
             source_col=source_col,
             target_col=target_col
         )
+        file_path = save_blob_to_file(blob, directory="./output")
         print("leaving network_plot")
-        return encoded
+        return file_path
     except Exception as e:
         print("errored network_plot", e)
         return None
@@ -286,12 +393,28 @@ def scatter_plot_regression(
     :param color: Color for scatter points.
     :param line_color: Color for regression line.
     :param show_r2: Whether to show R² value on the plot.
-    :return: The scatter plot as a base64-encoded image (string).
+    :return: The scatter plot location where it is saved.
     """
     print("running scatter_plot_regression")
+    # try:
+    #     plotter = ChartRenderer(fmt=fmt)
+    #     encoded = plotter.encode(
+    #         pd.DataFrame(data),
+    #         x=x,
+    #         y=y,
+    #         kind="scatter",
+    #         title=title,
+    #         regression=True,
+    #         show_r2=show_r2,
+    #         return_data_uri=return_data_uri,
+    #         color=color,
+    #         line_color=line_color
+    #     )
+    #     print("leaving scatter_plot_regression")
+    #     return encoded
     try:
         plotter = ChartRenderer(fmt=fmt)
-        encoded = plotter.encode(
+        blob = plotter.encode(
             pd.DataFrame(data),
             x=x,
             y=y,
@@ -303,8 +426,9 @@ def scatter_plot_regression(
             color=color,
             line_color=line_color
         )
+        file_path = save_blob_to_file(blob, directory="./output")
         print("leaving scatter_plot_regression")
-        return encoded
+        return file_path
     except Exception as e:
         print("errored scatter_plot_regression", e)
         return None
@@ -437,8 +561,13 @@ def research_questions(state: State) -> State:
         - Prefer the tool output (e.g., scatterplot) unless the tool explicitly returns an error or is empty.
         - If the tool errors or returns no usable value, use the model's answer.
         - Strictly no base64 images or plots generated directly from the model.
+        - All ***plotting tool outputs*** must be saved as files and their paths returned.
+        - Return filename of the saved plot instead of base64 string.
         """
 
+        # print("Length message:", len(messages))
+        # print("Full message:", repr(messages))
+        # print("Current message:", messages[-1])
         messages = [
             SystemMessage(content=system_prompt),
             HumanMessage(
@@ -493,6 +622,39 @@ def extract_final_answers(messages):
         return messages.content.strip()
 
 # ---------------- Routes ----------------
+
+def replace_files_with_base64(obj, base_dir="./output"):
+    """
+    Traverse dict/list and replace file paths or filenames with raw base64 strings.
+    Deletes the file after conversion.
+    """
+    if isinstance(obj, dict):
+        return {k: replace_files_with_base64(v, base_dir) for k, v in obj.items()}
+    elif isinstance(obj, list):
+        return [replace_files_with_base64(i, base_dir) for i in obj]
+    elif isinstance(obj, str):
+        # If it's an absolute path
+        if os.path.isabs(obj) and os.path.exists(obj):
+            file_path = obj
+        else:
+            # Treat as relative filename inside base_dir
+            file_path = os.path.join(base_dir, obj)
+        
+        if os.path.exists(file_path):
+            try:
+                with open(file_path, "rb") as f:
+                    encoded = base64.b64encode(f.read()).decode("utf-8")
+                os.remove(file_path)
+                print(f"Converted & deleted {file_path}")
+                return encoded
+            except Exception as e:
+                print(f"Error handling {file_path}: {e}")
+                return obj
+        else:
+            return obj
+    else:
+        return obj
+    
 @app.post("/api")
 async def handle_question(request: Request, session_id: str = Form("default")):
 
@@ -576,7 +738,7 @@ async def handle_question(request: Request, session_id: str = Form("default")):
     result = []
     thread_id = session_store.next_thread_id(session_id or "default")
     print("thread_id", thread_id)
-    config = {"configurable": {"thread_id": thread_id}, "recursion_limit": 50}
+    config = {"configurable": {"thread_id": thread_id}, "recursion_limit": 25}
     question_hm = [HumanMessage(content=questions_text)]
     file_texts_hm = [HumanMessage(content=file_texts)]
     image_b64s_hm = [HumanMessage(content=image_b64s)]
@@ -590,7 +752,8 @@ async def handle_question(request: Request, session_id: str = Form("default")):
         config=config
     )
 
-    final_answers = extract_final_answers(result["messages"][-1])
+    formated_text = extract_final_answers(result["messages"][-1])
+    final_answers = replace_files_with_base64(formated_text)
     # session_store.clear(session_id or "default")
 
     return JSONResponse(content=final_answers, status_code=200)
