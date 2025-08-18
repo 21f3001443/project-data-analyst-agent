@@ -39,7 +39,7 @@ app.add_middleware(
 )
 
 # ---------------- LLM ----------------
-llm = ChatOpenAI(model="gpt-5-mini", temperature=0, seed=1)
+llm = ChatOpenAI(model="gpt-5-micro", temperature=0, seed=1)
 
 # ---------------- Session store ----------------
 session_store = SessionStore(inactivity_seconds=5)  # 5 minutes
